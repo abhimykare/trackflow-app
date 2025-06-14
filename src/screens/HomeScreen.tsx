@@ -11,6 +11,7 @@ import {
   ScrollView,
   Dimensions,
 } from 'react-native';
+
 import { useNavigation } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
