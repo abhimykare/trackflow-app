@@ -1,4 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+'use client';
+
+import type React from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,32 +15,20 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
-  ScrollView,
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useRegister } from '../../services/authServices';
+import { useAuth } from '../../hooks/useAuth';
 
-// Import with debugging
-console.log('[RegisterScreen] Importing auth service...');
-console.log('[RegisterScreen] useRegister imported:', !!useRegister);
-
-const RegisterScreen: React.FC = () => {
-  const [fullName, setFullName] = useState('');
+const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const navigation = useNavigation();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
-  console.log('[RegisterScreen] Initializing useRegister hook...');
-  const registerMutation = useRegister();
-  console.log(
-    '[RegisterScreen] useRegister hook initialized:',
-    !!registerMutation,
-  );
+  const { login, isLoading, error, clearError } = useAuth();
 
   useEffect(() => {
     Animated.parallel([
@@ -56,64 +47,42 @@ const RegisterScreen: React.FC = () => {
     ]).start();
   }, []);
 
-  const handleRegister = () => {
-    console.log('[RegisterScreen] Register button pressed');
+  // Clear error when user starts typing
+  useEffect(() => {
+    if (error && (email || password)) {
+      clearError();
+    }
+  }, [email, password, error, clearError]);
+
+  const handleLogin = async () => {
+    console.log('[LoginScreen] 🔐 Login button pressed');
 
     // Basic validation
-    if (!fullName.trim()) {
-      Alert.alert('Error', 'Please enter your full name');
-      return;
-    }
-
     if (!email.trim()) {
       Alert.alert('Error', 'Please enter your email');
       return;
     }
 
     if (!password) {
-      Alert.alert('Error', 'Please enter a password');
+      Alert.alert('Error', 'Please enter your password');
       return;
     }
 
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
-
-    console.log('[RegisterScreen] Starting registration mutation...');
-    registerMutation.mutate(
-      {
-        fullName: fullName.trim(),
+    try {
+      console.log('[LoginScreen] 📤 Starting login...');
+      await login({
         email: email.trim().toLowerCase(),
         password,
-      },
-      {
-        onSuccess: data => {
-          console.log(
-            '[RegisterScreen] ✅ Registration successful:',
-            data.data.user.fullName,
-          );
-          Alert.alert('Success', 'Account created successfully!', [
-            {
-              text: 'OK',
-              // Remove the manual navigation - let RouteNavigator handle it
-              onPress: () => {
-                console.log(
-                  '[RegisterScreen] 🎯 Authentication state will update automatically',
-                );
-              },
-            },
-          ]);
-        },
-        onError: (error: any) => {
-          console.error('[RegisterScreen] ❌ Registration error:', error);
-          const errorMessage =
-            error.response?.data?.message ||
-            'Registration failed. Please try again.';
-          Alert.alert('Registration Failed', errorMessage);
-        },
-      },
-    );
+      });
+
+      console.log('[LoginScreen] ✅ Login successful');
+      // Navigation will happen automatically via RouteNavigator
+    } catch (err: any) {
+      console.error('[LoginScreen] ❌ Login failed:', err);
+      const errorMessage =
+        error || 'Login failed. Please check your credentials.';
+      Alert.alert('Login Failed', errorMessage);
+    }
   };
 
   return (
@@ -124,122 +93,86 @@ const RegisterScreen: React.FC = () => {
       >
         <StatusBar barStyle="light-content" backgroundColor="#0a0a15" />
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.content}>
-            <Animated.View
-              style={[
-                styles.headerContainer,
-                {
-                  opacity: fadeAnim,
-                  transform: [{ translateY: slideAnim }],
-                },
-              ]}
+        <View style={styles.content}>
+          <Animated.View
+            style={[
+              styles.logoContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <Text style={styles.logoEmoji}>📊</Text>
+            <Text style={styles.appName}>TrackFlow</Text>
+            <Text style={styles.tagline}>Smart expense tracking</Text>
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              styles.formContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Email</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your email"
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                editable={!isLoading}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Password</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your password"
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                editable={!isLoading}
+              />
+            </View>
+
+            <TouchableOpacity style={styles.forgotPassword}>
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.loginButton, isLoading && styles.disabledButton]}
+              onPress={handleLogin}
+              disabled={isLoading}
             >
+              <Text style={styles.loginButtonText}>
+                {isLoading ? 'Signing In...' : 'Login'}
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.registerContainer}>
+              <Text style={styles.registerText}>Don't have an account? </Text>
               <TouchableOpacity
-                style={styles.backButton}
-                onPress={() => navigation.goBack()}
+                onPress={() => navigation.navigate('Register' as never)}
+                disabled={isLoading}
               >
-                <Text style={styles.backButtonText}>←</Text>
+                <Text style={styles.registerLink}>Register</Text>
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>Create Account</Text>
-              <View style={styles.placeholder} />
-            </Animated.View>
+            </View>
+          </Animated.View>
+        </View>
 
-            <Animated.View
-              style={[
-                styles.formContainer,
-                {
-                  opacity: fadeAnim,
-                  transform: [{ translateY: slideAnim }],
-                },
-              ]}
-            >
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Full Name</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter your full name"
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  value={fullName}
-                  onChangeText={setFullName}
-                  editable={!registerMutation.isPending}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Email</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter your email"
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  editable={!registerMutation.isPending}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Password</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Create a password"
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  editable={!registerMutation.isPending}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Confirm Password</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Confirm your password"
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry
-                  editable={!registerMutation.isPending}
-                />
-              </View>
-
-              <View style={styles.termsContainer}>
-                <Text style={styles.termsText}>
-                  By registering, you agree to our{' '}
-                  <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-                  <Text style={styles.termsLink}>Privacy Policy</Text>
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                style={[
-                  styles.registerButton,
-                  registerMutation.isPending && styles.disabledButton,
-                ]}
-                onPress={handleRegister}
-                disabled={registerMutation.isPending}
-              >
-                <Text style={styles.registerButtonText}>
-                  {registerMutation.isPending
-                    ? 'Creating Account...'
-                    : 'Register'}
-                </Text>
-              </TouchableOpacity>
-
-              <View style={styles.loginContainer}>
-                <Text style={styles.loginText}>Already have an account? </Text>
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('Login' as never)}
-                >
-                  <Text style={styles.loginLink}>Login</Text>
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-          </View>
-        </ScrollView>
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>TrackFlow v1.0</Text>
+        </View>
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );
@@ -250,42 +183,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0a0a15',
   },
-  scrollContent: {
-    flexGrow: 1,
-  },
   content: {
     flex: 1,
+    justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 40,
   },
-  headerContainer: {
-    flexDirection: 'row',
+  logoContainer: {
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: 40,
   },
-  backButton: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    padding: 12,
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
+  logoEmoji: {
+    fontSize: 60,
+    marginBottom: 16,
   },
-  backButtonText: {
+  appName: {
+    fontSize: 32,
+    fontWeight: '800',
     color: '#ffffff',
-    fontSize: 20,
-    fontWeight: 'bold',
+    marginBottom: 8,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  placeholder: {
-    width: 44,
+  tagline: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
   },
   formContainer: {
     width: '100%',
@@ -308,19 +228,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
   },
-  termsContainer: {
+  forgotPassword: {
+    alignSelf: 'flex-end',
     marginBottom: 24,
   },
-  termsText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  termsLink: {
+  forgotPasswordText: {
     color: '#4facfe',
-    fontWeight: '600',
+    fontSize: 14,
   },
-  registerButton: {
+  loginButton: {
     backgroundColor: '#4facfe',
     borderRadius: 12,
     padding: 16,
@@ -330,24 +246,32 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: 'rgba(79, 172, 254, 0.5)',
   },
-  registerButtonText: {
+  loginButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',
   },
-  loginContainer: {
+  registerContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
   },
-  loginText: {
+  registerText: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: 14,
   },
-  loginLink: {
+  registerLink: {
     color: '#4facfe',
     fontSize: 14,
     fontWeight: '600',
   },
+  footer: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+  },
 });
 
-export default RegisterScreen;
+export default LoginScreen;

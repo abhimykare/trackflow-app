@@ -1,5 +1,5 @@
-import axios, { AxiosInstance } from 'axios';
-import storage from '../utils/storage';
+import axios, { type AxiosInstance } from 'axios';
+import { useAuthStore } from '../store/authStore';
 
 const BASE_URL = 'http://10.0.2.2:5001/api'; // Android emulator
 
@@ -8,7 +8,7 @@ console.log('[API] Initializing API with base URL:', BASE_URL);
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000, // Increased timeout
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -19,7 +19,10 @@ apiClient.interceptors.request.use(
   async config => {
     try {
       console.log('[API] Making request to:', config.url);
-      const token = await storage.getItem('authToken');
+
+      // Get token from Zustand store
+      const token = useAuthStore.getState().token;
+
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
         console.log('[API] ✅ Added auth token to request');
@@ -27,7 +30,7 @@ apiClient.interceptors.request.use(
         console.log('[API] ℹ️ No auth token found');
       }
     } catch (error) {
-      console.error('[API] ❌ Error getting token from storage:', error);
+      console.error('[API] ❌ Error getting token:', error);
     }
     return config;
   },
@@ -58,75 +61,19 @@ apiClient.interceptors.response.use(
     );
 
     if (status === 401) {
-      console.log('[API] 🔄 Token expired, clearing storage');
+      console.log('[API] 🔄 Token expired, clearing auth state');
       try {
-        await storage.removeItem('authToken');
-        await storage.removeItem('userData');
-      } catch (storageError) {
-        console.error('[API] ❌ Error clearing storage:', storageError);
+        // Clear auth state using Zustand
+        useAuthStore.getState().clearAuth();
+      } catch (clearError) {
+        console.error('[API] ❌ Error clearing auth state:', clearError);
       }
     }
     return Promise.reject(error);
   },
 );
 
-// Token management functions
-const tokenManager = {
-  setToken: async (token: string): Promise<void> => {
-    try {
-      await storage.setItem('authToken', token);
-      console.log('[TokenManager] ✅ Token stored successfully');
-    } catch (error) {
-      console.error('[TokenManager] ❌ Error storing token:', error);
-      throw error;
-    }
-  },
-
-  getToken: async (): Promise<string | null> => {
-    try {
-      const token = await storage.getItem('authToken');
-      console.log('[TokenManager] Token retrieved:', !!token);
-      return token;
-    } catch (error) {
-      console.error('[TokenManager] ❌ Error getting token:', error);
-      return null;
-    }
-  },
-
-  removeToken: async (): Promise<void> => {
-    try {
-      await storage.removeItem('authToken');
-      await storage.removeItem('userData');
-      console.log('[TokenManager] ✅ Tokens removed successfully');
-    } catch (error) {
-      console.error('[TokenManager] ❌ Error removing tokens:', error);
-    }
-  },
-
-  setUserData: async (userData: any): Promise<void> => {
-    try {
-      await storage.setItem('userData', JSON.stringify(userData));
-      console.log('[TokenManager] ✅ User data stored successfully');
-    } catch (error) {
-      console.error('[TokenManager] ❌ Error storing user data:', error);
-      throw error;
-    }
-  },
-
-  getUserData: async (): Promise<any> => {
-    try {
-      const userData = await storage.getItem('userData');
-      const parsed = userData ? JSON.parse(userData) : null;
-      console.log('[TokenManager] User data retrieved:', !!parsed);
-      return parsed;
-    } catch (error) {
-      console.error('[TokenManager] ❌ Error getting user data:', error);
-      return null;
-    }
-  },
-};
-
 console.log('[API] ✅ API configuration loaded successfully');
 
-export { apiClient, tokenManager };
-export default { apiClient, tokenManager };
+export { apiClient };
+export default apiClient;

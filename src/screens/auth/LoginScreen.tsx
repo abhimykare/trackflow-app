@@ -1,4 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+'use client';
+
+import type React from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,7 +18,7 @@ import {
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useLogin } from '../../services/authServices';
+import { useAuth } from '../../hooks/useAuth';
 
 const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -25,7 +28,7 @@ const LoginScreen: React.FC = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
-  const loginMutation = useLogin();
+  const { login, isLoading, error, clearError } = useAuth();
 
   useEffect(() => {
     Animated.parallel([
@@ -44,7 +47,14 @@ const LoginScreen: React.FC = () => {
     ]).start();
   }, []);
 
-  const handleLogin = () => {
+  // Clear error when user starts typing
+  useEffect(() => {
+    if (error && (email || password)) {
+      clearError();
+    }
+  }, [email, password, error, clearError]);
+
+  const handleLogin = async () => {
     console.log('[LoginScreen] 🔐 Login button pressed');
 
     // Basic validation
@@ -58,33 +68,21 @@ const LoginScreen: React.FC = () => {
       return;
     }
 
-    console.log('[LoginScreen] 📤 Starting login mutation...');
-    loginMutation.mutate(
-      {
+    try {
+      console.log('[LoginScreen] 📤 Starting login...');
+      await login({
         email: email.trim().toLowerCase(),
         password,
-      },
-      {
-        onSuccess: data => {
-          console.log(
-            '[LoginScreen] ✅ Login successful, user:',
-            data.data.user.fullName,
-          );
-          // Don't navigate manually - let the RouteNavigator handle it automatically
-          // The authentication state change will trigger the navigation
-          console.log(
-            '[LoginScreen] 🎯 Authentication state will update automatically',
-          );
-        },
-        onError: (error: any) => {
-          console.error('[LoginScreen] ❌ Login failed:', error);
-          const errorMessage =
-            error.response?.data?.message ||
-            'Login failed. Please check your credentials.';
-          Alert.alert('Login Failed', errorMessage);
-        },
-      },
-    );
+      });
+
+      console.log('[LoginScreen] ✅ Login successful');
+      // Navigation will happen automatically via RouteNavigator
+    } catch (err: any) {
+      console.error('[LoginScreen] ❌ Login failed:', err);
+      const errorMessage =
+        error || 'Login failed. Please check your credentials.';
+      Alert.alert('Login Failed', errorMessage);
+    }
   };
 
   return (
@@ -129,7 +127,7 @@ const LoginScreen: React.FC = () => {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                editable={!loginMutation.isPending}
+                editable={!isLoading}
               />
             </View>
 
@@ -142,7 +140,7 @@ const LoginScreen: React.FC = () => {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
-                editable={!loginMutation.isPending}
+                editable={!isLoading}
               />
             </View>
 
@@ -151,15 +149,12 @@ const LoginScreen: React.FC = () => {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[
-                styles.loginButton,
-                loginMutation.isPending && styles.disabledButton,
-              ]}
+              style={[styles.loginButton, isLoading && styles.disabledButton]}
               onPress={handleLogin}
-              disabled={loginMutation.isPending}
+              disabled={isLoading}
             >
               <Text style={styles.loginButtonText}>
-                {loginMutation.isPending ? 'Signing In...' : 'Login'}
+                {isLoading ? 'Signing In...' : 'Login'}
               </Text>
             </TouchableOpacity>
 
@@ -167,6 +162,7 @@ const LoginScreen: React.FC = () => {
               <Text style={styles.registerText}>Don't have an account? </Text>
               <TouchableOpacity
                 onPress={() => navigation.navigate('Register' as never)}
+                disabled={isLoading}
               >
                 <Text style={styles.registerLink}>Register</Text>
               </TouchableOpacity>

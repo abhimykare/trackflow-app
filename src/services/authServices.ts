@@ -1,10 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiClient, tokenManager } from '../config/api';
+import { apiClient } from '../config/api';
+import { useAuthStore } from '../store/authStore';
+
 import type {
   RegisterRequest,
   LoginRequest,
   AuthResponse,
-  User,
 } from '../types/auth';
 
 console.log('[AuthService] 🚀 Loading auth service...');
@@ -41,26 +41,10 @@ const authApi = {
     }
   },
 
-  getCurrentUser: async (): Promise<User> => {
-    try {
-      const userData = await tokenManager.getUserData();
-      if (!userData) {
-        throw new Error('No user data found');
-      }
-      console.log(
-        '[AuthService] 👤 Current user retrieved:',
-        userData.fullName,
-      );
-      return userData;
-    } catch (error) {
-      console.error('[AuthService] ❌ Get current user failed:', error);
-      throw error;
-    }
-  },
-
   logout: async (): Promise<void> => {
     try {
-      await tokenManager.removeToken();
+      // Optional: Call logout endpoint if your API has one
+      // await apiClient.post('/auth/logout');
       console.log('[AuthService] ✅ Logout successful');
     } catch (error) {
       console.error('[AuthService] ❌ Logout failed:', error);
@@ -69,115 +53,96 @@ const authApi = {
   },
 };
 
-// Custom hooks
-export const useRegister = () => {
-  const queryClient = useQueryClient();
+// Auth service functions
+export const authService = {
+  register: async (data: RegisterRequest): Promise<void> => {
+    const { setAuth, setLoading } = useAuthStore.getState();
 
-  return useMutation({
-    mutationFn: authApi.register,
-    onSuccess: async data => {
-      try {
-        console.log('[AuthService] 💾 Storing registration data...');
+    try {
+      setLoading(true);
+      console.log('[AuthService] 📝 Processing registration...');
 
-        await tokenManager.setToken(data.data.token);
-        await tokenManager.setUserData(data.data.user);
-        queryClient.setQueryData(['currentUser'], data.data.user);
+      const response = await authApi.register(data);
 
-        console.log('[AuthService] ✅ Registration process completed');
-      } catch (error) {
-        console.error(
-          '[AuthService] ❌ Error storing registration data:',
-          error,
+      if (response.success && response.data) {
+        const { user, token } = response.data;
+        setAuth(user, token);
+        console.log(
+          '[AuthService] ✅ Registration completed for:',
+          user.fullName,
         );
-        throw error;
+      } else {
+        throw new Error(response.message || 'Registration failed');
       }
-    },
-    onError: (error: any) => {
-      console.error(
-        '[AuthService] ❌ Registration mutation failed:',
-        error.response?.data || error.message,
-      );
-    },
-  });
-};
+    } catch (error: any) {
+      console.error('[AuthService] ❌ Registration error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  },
 
-export const useLogin = () => {
-  const queryClient = useQueryClient();
+  login: async (data: LoginRequest): Promise<void> => {
+    const { setAuth, setLoading } = useAuthStore.getState();
 
-  return useMutation({
-    mutationFn: authApi.login,
-    onSuccess: async data => {
-      try {
-        console.log('[AuthService] 💾 Storing login data...');
+    try {
+      setLoading(true);
+      console.log('[AuthService] 🔐 Processing login...');
 
-        await tokenManager.setToken(data.data.token);
-        await tokenManager.setUserData(data.data.user);
-        queryClient.setQueryData(['currentUser'], data.data.user);
+      const response = await authApi.login(data);
 
-        console.log('[AuthService] ✅ Login process completed');
-      } catch (error) {
-        console.error('[AuthService] ❌ Error storing login data:', error);
-        throw error;
+      if (response.success && response.data) {
+        const { user, token } = response.data;
+        setAuth(user, token);
+        console.log('[AuthService] ✅ Login completed for:', user.fullName);
+      } else {
+        throw new Error(response.message || 'Login failed');
       }
-    },
-    onError: (error: any) => {
-      console.error(
-        '[AuthService] ❌ Login mutation failed:',
-        error.response?.data || error.message,
-      );
-    },
-  });
-};
+    } catch (error: any) {
+      console.error('[AuthService] ❌ Login error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  },
 
-export const useCurrentUser = () => {
-  return useQuery({
-    queryKey: ['currentUser'],
-    queryFn: authApi.getCurrentUser,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    retry: false,
-    // Enable auto-fetch so user data is available immediately
-    enabled: true,
-  });
-};
+  logout: async (): Promise<void> => {
+    const { clearAuth, setLoading } = useAuthStore.getState();
 
-export const useLogout = () => {
-  const queryClient = useQueryClient();
+    try {
+      setLoading(true);
+      console.log('[AuthService] 🚪 Processing logout...');
 
-  return useMutation({
-    mutationFn: authApi.logout,
-    onSuccess: () => {
-      queryClient.clear();
-      console.log('[AuthService] ✅ Logout completed, cache cleared');
-    },
-  });
-};
+      await authApi.logout();
+      clearAuth();
 
-// Enhanced auth status hook for navigation
-export const useAuthStatus = () => {
-  const { data: user, isLoading, error } = useCurrentUser();
+      console.log('[AuthService] ✅ Logout completed');
+    } catch (error: any) {
+      console.error('[AuthService] ❌ Logout error:', error);
+      // Clear auth even if API call fails
+      clearAuth();
+    } finally {
+      setLoading(false);
+    }
+  },
 
-  const isAuthenticated = !!user && !error;
+  // Helper function to check if user is authenticated
+  isAuthenticated: (): boolean => {
+    const { isAuthenticated } = useAuthStore.getState();
+    return isAuthenticated;
+  },
 
-  console.log('[AuthService] Auth Status Check:', {
-    hasUser: !!user,
-    hasError: !!error,
-    isAuthenticated,
-    isLoading,
-  });
+  // Get current user
+  getCurrentUser: () => {
+    const { user } = useAuthStore.getState();
+    return user;
+  },
 
-  return {
-    isAuthenticated,
-    user,
-    isLoading,
-    error,
-    // Helper functions for easy access to user data
-    userName: user?.fullName || '',
-    userEmail: user?.email || '',
-    userPreferences: user?.preferences,
-    monthlyIncome: user?.monthlyIncome,
-    currency: user?.preferences?.currency || 'INR',
-    theme: user?.preferences?.theme || 'dark',
-  };
+  // Get auth token
+  getToken: (): string | null => {
+    const { token } = useAuthStore.getState();
+    return token;
+  },
 };
 
 console.log('[AuthService] ✅ Auth service loaded successfully');

@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react';
+'use client';
+
+import type React from 'react';
+import { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import {
   createStackNavigator,
-  StackNavigationProp,
+  type StackNavigationProp,
 } from '@react-navigation/stack';
 import { View, Text, StyleSheet } from 'react-native';
 import HomeScreen from '../screens/HomeScreen';
@@ -19,9 +22,13 @@ import NotificationsScreen from '../screens/Profile/NotificationsScreen';
 import FAQScreen from '../screens/Profile/FAQScreen';
 import ContactUsScreen from '../screens/Profile/ContactUsScreen';
 import AboutTrackFlowScreen from '../screens/Profile/AboutTrackFlowScreen';
-import { tokenManager } from '../config/api';
-import { useQueryClient } from '@tanstack/react-query';
-import { useAuthStatus } from '../services/authServices';
+import {
+  useAuthStore,
+  useIsAuthenticated,
+  useAuthLoading,
+  useAuthInitialized,
+  useAuthUser,
+} from '../store/authStore';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -98,45 +105,44 @@ const AppStack = () => (
 );
 
 const RouteNavigator = () => {
-  const queryClient = useQueryClient();
-  const [isInitialized, setIsInitialized] = useState(false);
-  const { isAuthenticated, isLoading, user } = useAuthStatus();
+  const isAuthenticated = useIsAuthenticated();
+  const isLoading = useAuthLoading();
+  const isInitialized = useAuthInitialized();
+  const user = useAuthUser();
+  const setInitialized = useAuthStore(state => state.setInitialized);
 
-  // Initialize user data from storage on app start
+  // Initialize app and wait for auth state to be rehydrated
   useEffect(() => {
-    initializeApp();
-  }, []);
+    const initializeApp = async () => {
+      try {
+        console.log('[RouteNavigator] 🚀 Initializing app...');
 
-  const initializeApp = async () => {
-    try {
-      console.log('[RouteNavigator] 🚀 Initializing app...');
+        // Give Zustand persist some time to rehydrate
+        await new Promise(resolve => setTimeout(resolve, 100));
 
-      const token = await tokenManager.getToken();
-      const userData = await tokenManager.getUserData();
+        console.log('[RouteNavigator] 🔍 Auth state after rehydration:');
+        console.log('[RouteNavigator] - Is Authenticated:', isAuthenticated);
+        console.log('[RouteNavigator] - User:', user?.fullName || 'None');
 
-      console.log('[RouteNavigator] 🔍 Checking stored data:');
-      console.log('[RouteNavigator] Token exists:', !!token);
-      console.log('[RouteNavigator] User data exists:', !!userData);
-
-      if (token && userData) {
-        console.log(
-          '[RouteNavigator] ✅ Setting cached user data:',
-          userData.fullName,
-        );
-        // Set the user data in React Query cache
-        queryClient.setQueryData(['currentUser'], userData);
-      } else {
-        console.log('[RouteNavigator] ℹ️ No cached user data found');
+        setInitialized(true);
+        console.log('[RouteNavigator] ✅ App initialization completed');
+      } catch (error) {
+        console.error('[RouteNavigator] ❌ Error initializing app:', error);
+        setInitialized(true); // Set initialized even on error
       }
-    } catch (error) {
-      console.error('[RouteNavigator] ❌ Error initializing app:', error);
-    } finally {
-      setIsInitialized(true);
-    }
-  };
+    };
 
-  // Show loading screen while initializing
+    if (!isInitialized) {
+      initializeApp();
+    }
+  }, [isInitialized, setInitialized, isAuthenticated, user]);
+
+  // Show loading screen while initializing or during auth operations
   if (!isInitialized || isLoading) {
+    console.log('[RouteNavigator] 🔄 Showing loading screen:', {
+      isInitialized,
+      isLoading,
+    });
     return (
       <NavigationContainer>
         <LoadingScreen />
