@@ -1,5 +1,3 @@
-'use client';
-
 import type React from 'react';
 import { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
@@ -8,7 +6,7 @@ import {
   type StackNavigationProp,
 } from '@react-navigation/stack';
 import { View, Text, StyleSheet } from 'react-native';
-import HomeScreen from '../screens/HomeScreen';
+import HomeScreen from '../screens/home/HomeScreen';
 import DetailedViewScreen from '../screens/DetailedViewScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreens';
@@ -22,6 +20,7 @@ import NotificationsScreen from '../screens/Profile/NotificationsScreen';
 import FAQScreen from '../screens/Profile/FAQScreen';
 import ContactUsScreen from '../screens/Profile/ContactUsScreen';
 import AboutTrackFlowScreen from '../screens/Profile/AboutTrackFlowScreen';
+
 import {
   useAuthStore,
   useIsAuthenticated,
@@ -29,6 +28,9 @@ import {
   useAuthInitialized,
   useAuthUser,
 } from '../store/authStore';
+import AddExpenseScreen from '../screens/expense/AddExpenseScreen';
+import CategoriesScreen from '../screens/categories/CategoriesScreen';
+import TransactionsScreen from '../screens/transactions/TransactionsScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -45,6 +47,10 @@ export type RootStackParamList = {
   FAQ: undefined;
   ContactUs: undefined;
   AboutTrackFlow: undefined;
+  // New screens
+  AddExpense: undefined;
+  Categories: undefined;
+  Transactions: undefined;
 };
 
 export type HomeScreenNavigationProp = StackNavigationProp<
@@ -101,6 +107,10 @@ const AppStack = () => (
     <Stack.Screen name="FAQ" component={FAQScreen} />
     <Stack.Screen name="ContactUs" component={ContactUsScreen} />
     <Stack.Screen name="AboutTrackFlow" component={AboutTrackFlowScreen} />
+    {/* New screens */}
+    <Stack.Screen name="AddExpense" component={AddExpenseScreen} />
+    <Stack.Screen name="Categories" component={CategoriesScreen} />
+    <Stack.Screen name="Transactions" component={TransactionsScreen} />
   </Stack.Navigator>
 );
 

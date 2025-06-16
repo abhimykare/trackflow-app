@@ -1,4 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import type React from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useAuthStore } from '../../store/authStore';
 import {
   SafeAreaView,
   View,
@@ -13,10 +15,10 @@ import {
 } from 'react-native';
 
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 const { width } = Dimensions.get('window');
 
-// Mock data
 const monthlyData = [
   {
     id: '1',
@@ -59,7 +61,16 @@ const monthlyData = [
   },
 ];
 
-const quickActions = [
+interface QuickAction {
+  id: string;
+  title: string;
+  icon: string;
+  color: string;
+  action: string;
+  screen: keyof RootStackParamList;
+}
+
+const quickActions: QuickAction[] = [
   {
     id: '1',
     title: 'Add Expense',
@@ -74,7 +85,7 @@ const quickActions = [
     icon: '🎯',
     color: '#4ecdc4',
     action: 'setBudget',
-    screen: 'SetBudget',
+    screen: 'Categories',
   },
   {
     id: '3',
@@ -82,7 +93,7 @@ const quickActions = [
     icon: '📊',
     color: '#45b7d1',
     action: 'viewReports',
-    screen: 'Reports',
+    screen: 'Transactions',
   },
   {
     id: '4',
@@ -213,11 +224,22 @@ const insights = [
   },
 ];
 
-const HomeScreen = () => {
-  const navigation = useNavigation();
+type RootStackParamList = {
+  Home: undefined;
+  Profile: undefined;
+  Categories: undefined;
+  Transactions: undefined;
+  AddExpense: undefined;
+  DetailedView: { month: string };
+};
+
+const HomeScreen: React.FC = () => {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const [selectedPeriod, setSelectedPeriod] = useState('This Month');
+  const user = useAuthStore(state => state.user);
 
   const currentMonth = monthlyData[0];
   const budgetUsed = (currentMonth.totalExpenses / currentMonth.budget) * 100;
@@ -236,13 +258,13 @@ const HomeScreen = () => {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [fadeAnim, slideAnim]);
 
-  const handleQuickAction = screen => {
+  const handleQuickAction = (screen: keyof RootStackParamList) => {
     navigation.navigate(screen);
   };
 
-  const renderQuickAction = ({ item }) => (
+  const renderQuickAction = ({ item }: { item: QuickAction }) => (
     <TouchableOpacity
       style={[styles.quickActionCard, { backgroundColor: `${item.color}20` }]}
       onPress={() => handleQuickAction(item.screen)}
@@ -254,8 +276,11 @@ const HomeScreen = () => {
     </TouchableOpacity>
   );
 
-  const renderCategoryItem = ({ item }) => (
-    <TouchableOpacity style={styles.categoryCard}>
+  const renderCategoryItem = ({ item }: { item: any }) => (
+    <TouchableOpacity
+      style={styles.categoryCard}
+      onPress={() => navigation.navigate('Categories')}
+    >
       <View style={styles.categoryHeader}>
         <View style={[styles.categoryIcon, { backgroundColor: item.color }]}>
           <Text style={styles.categoryEmoji}>{item.icon}</Text>
@@ -296,8 +321,11 @@ const HomeScreen = () => {
     </TouchableOpacity>
   );
 
-  const renderTransaction = ({ item }) => (
-    <View style={styles.transactionItem}>
+  const renderTransaction = ({ item }: { item: any }) => (
+    <TouchableOpacity
+      style={styles.transactionItem}
+      onPress={() => navigation.navigate('Transactions')}
+    >
       <View style={styles.transactionIcon}>
         <Text style={styles.transactionEmoji}>{item.icon}</Text>
       </View>
@@ -308,10 +336,10 @@ const HomeScreen = () => {
         </Text>
       </View>
       <Text style={styles.transactionAmount}>-₹{item.amount}</Text>
-    </View>
+    </TouchableOpacity>
   );
 
-  const renderInsight = ({ item }) => (
+  const renderInsight = ({ item }: { item: any }) => (
     <View style={[styles.insightCard, { borderLeftColor: item.color }]}>
       <View style={styles.insightHeader}>
         <Text style={styles.insightIcon}>{item.icon}</Text>
@@ -321,7 +349,7 @@ const HomeScreen = () => {
     </View>
   );
 
-  const renderMonthItem = ({ item }) => (
+  const renderMonthItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.monthCard}
       onPress={() => navigation.navigate('DetailedView', { month: item.month })}
@@ -369,11 +397,15 @@ const HomeScreen = () => {
         >
           <View style={styles.headerLeft}>
             <View style={styles.profileAvatar}>
-              <Text style={styles.profileAvatarText}>AK</Text>
+              <Text style={styles.profileAvatarText}>
+                {user?.fullName?.charAt(0)?.toUpperCase() || 'AK'}
+              </Text>
             </View>
             <View style={styles.headerInfo}>
               <Text style={styles.headerGreeting}>Good Evening</Text>
-              <Text style={styles.headerName}>Arun Kumar</Text>
+              <Text style={styles.headerName}>
+                {user?.fullName || 'Arun Kumar'}
+              </Text>
             </View>
           </View>
           <TouchableOpacity
