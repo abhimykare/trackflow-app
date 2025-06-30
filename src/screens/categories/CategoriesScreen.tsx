@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -14,8 +14,8 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../routes/routeNavigator';
+import { useGetCategories } from '../../services/categoriesServices';
 
-// Available icons for categories
 const availableIcons = [
   '🍛',
   '🛵',
@@ -62,128 +62,67 @@ const availableColors = [
 ];
 
 interface Category {
-  id: string;
+  id: string; // This will map to _id from backend
   name: string;
-  amount: number;
-  budget: number;
   icon: string;
   color: string;
-  percentage: number;
-  transactions: number;
+  _id?: string; // Optional backend ID for cases where it's still present
+  description?: string;
+  userId?: string;
+  isDefault?: boolean;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
-
-const initialCategoriesData: Category[] = [
-  {
-    id: '1',
-    name: 'Food',
-    amount: 2500,
-    budget: 4000,
-    icon: '🍛',
-    color: '#ff6b6b',
-    percentage: 62.5,
-    transactions: 12,
-  },
-  {
-    id: '2',
-    name: 'Transport',
-    amount: 1800,
-    budget: 2500,
-    icon: '🛵',
-    color: '#4ecdc4',
-    percentage: 72,
-    transactions: 8,
-  },
-  {
-    id: '3',
-    name: 'Bills',
-    amount: 4200,
-    budget: 5000,
-    icon: '📄',
-    color: '#6c5ce7',
-    percentage: 84,
-    transactions: 6,
-  },
-  {
-    id: '4',
-    name: 'Shopping',
-    amount: 3500,
-    budget: 4000,
-    icon: '🛍️',
-    color: '#45b7d1',
-    percentage: 87.5,
-    transactions: 15,
-  },
-  {
-    id: '5',
-    name: 'Health',
-    amount: 2800,
-    budget: 3000,
-    icon: '⚕️',
-    color: '#a29bfe',
-    percentage: 93.3,
-    transactions: 4,
-  },
-  {
-    id: '6',
-    name: 'Entertainment',
-    amount: 1500,
-    budget: 2000,
-    icon: '🎭',
-    color: '#f9ca24',
-    percentage: 75,
-    transactions: 7,
-  },
-];
 
 const CategoriesScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [categories, setCategories] = useState<Category[]>(
-    initialCategoriesData,
+  const { data: categoriesData, isLoading, isError, error } = useGetCategories();
+    const [categories, setCategories] = useState<Category[]>(
+    [],
   );
-  const [editingCategory, setEditingCategory] = useState<string | null>(null);
-  const [newBudget, setNewBudget] = useState('');
+
+  useEffect(() => {
+    if (categoriesData?.data?.categories) {
+      const transformedCategories: Category[] = categoriesData.data.categories.map(cat => ({
+        id: cat._id,
+        name: cat.name,
+        icon: cat.icon,
+        color: cat.color,
+      }));
+      setCategories(transformedCategories);
+    }
+  }, [categoriesData]);
+
 
   // Modal states
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  const [currentEditingCategory, setCurrentEditingCategory] =
-    useState<Category | null>(null);
+  const [currentEditingCategory, setCurrentEditingCategory] = useState<Category | null>(null);
 
   // Form states
   const [formName, setFormName] = useState('');
-  const [formBudget, setFormBudget] = useState('');
   const [formIcon, setFormIcon] = useState('🍛');
   const [formColor, setFormColor] = useState('#ff6b6b');
 
   const resetForm = () => {
     setFormName('');
-    setFormBudget('');
     setFormIcon('🍛');
     setFormColor('#ff6b6b');
   };
 
   const handleAddCategory = () => {
-    if (!formName.trim() || !formBudget.trim()) {
+    if (!formName.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    const budget = parseFloat(formBudget);
-    if (isNaN(budget) || budget <= 0) {
-      Alert.alert('Error', 'Please enter a valid budget amount');
-      return;
-    }
-
     const newCategory: Category = {
-      id: Date.now().toString(),
+      id: Date.now().toString(), // Temporary ID for client-side
       name: formName.trim(),
-      amount: 0,
-      budget: budget,
       icon: formIcon,
       color: formColor,
-      percentage: 0,
-      transactions: 0,
     };
 
     setCategories(prev => [...prev, newCategory]);
@@ -195,21 +134,14 @@ const CategoriesScreen: React.FC = () => {
   const handleEditCategory = (category: Category) => {
     setCurrentEditingCategory(category);
     setFormName(category.name);
-    setFormBudget(category.budget.toString());
     setFormIcon(category.icon);
     setFormColor(category.color);
     setIsEditModalVisible(true);
   };
 
   const handleUpdateCategory = () => {
-    if (!formName.trim() || !formBudget.trim() || !currentEditingCategory) {
+    if (!formName.trim() || !currentEditingCategory) {
       Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
-
-    const budget = parseFloat(formBudget);
-    if (isNaN(budget) || budget <= 0) {
-      Alert.alert('Error', 'Please enter a valid budget amount');
       return;
     }
 
@@ -219,10 +151,8 @@ const CategoriesScreen: React.FC = () => {
           ? {
               ...cat,
               name: formName.trim(),
-              budget: budget,
-              icon: formIcon,
+              icon: formColor,
               color: formColor,
-              percentage: (cat.amount / budget) * 100,
             }
           : cat,
       ),
@@ -252,30 +182,9 @@ const CategoriesScreen: React.FC = () => {
     );
   };
 
-  const handleEditBudget = (categoryId: string, currentBudget: number) => {
-    setEditingCategory(categoryId);
-    setNewBudget(currentBudget.toString());
-  };
 
-  const handleSaveBudget = (categoryId: string) => {
-    const budget = parseFloat(newBudget);
-    if (isNaN(budget) || budget <= 0) {
-      Alert.alert('Error', 'Please enter a valid budget amount');
-      return;
-    }
 
-    setCategories(prev =>
-      prev.map(cat =>
-        cat.id === categoryId
-          ? { ...cat, budget, percentage: (cat.amount / budget) * 100 }
-          : cat,
-      ),
-    );
-    setEditingCategory(null);
-    setNewBudget('');
-  };
-
-  const renderCategoryItem = (category: Category) => (
+const renderCategoryItem = (category: Category) => (
     <View key={category.id} style={styles.categoryCard}>
       <View style={styles.categoryHeader}>
         <View
@@ -285,17 +194,8 @@ const CategoriesScreen: React.FC = () => {
         </View>
         <View style={styles.categoryInfo}>
           <Text style={styles.categoryName}>{category.name}</Text>
-          <Text style={styles.categoryTransactions}>
-            {category.transactions} transactions
-          </Text>
         </View>
         <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => handleEditBudget(category.id, category.budget)}
-          >
-            <Text style={styles.editButtonText}>₹</Text>
-          </TouchableOpacity>
           <TouchableOpacity
             style={styles.editButton}
             onPress={() => handleEditCategory(category)}
@@ -309,81 +209,6 @@ const CategoriesScreen: React.FC = () => {
             <Text style={styles.editButtonText}>🗑️</Text>
           </TouchableOpacity>
         </View>
-      </View>
-
-      <View style={styles.categoryStats}>
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Spent</Text>
-          <Text style={styles.statValue}>
-            ₹{category.amount.toLocaleString('en-IN')}
-          </Text>
-        </View>
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Budget</Text>
-          {editingCategory === category.id ? (
-            <View style={styles.budgetEditContainer}>
-              <TextInput
-                style={styles.budgetInput}
-                value={newBudget}
-                onChangeText={setNewBudget}
-                keyboardType="numeric"
-                autoFocus
-              />
-              <TouchableOpacity
-                style={styles.saveButton}
-                onPress={() => handleSaveBudget(category.id)}
-              >
-                <Text style={styles.saveButtonText}>✓</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <Text style={styles.statValue}>
-              ₹{category.budget.toLocaleString('en-IN')}
-            </Text>
-          )}
-        </View>
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Remaining</Text>
-          <Text
-            style={[
-              styles.statValue,
-              {
-                color:
-                  category.budget - category.amount > 0 ? '#00d4aa' : '#ff6b6b',
-              },
-            ]}
-          >
-            ₹{(category.budget - category.amount).toLocaleString('en-IN')}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.progressSection}>
-        <View style={styles.progressBarContainer}>
-          <View style={styles.progressBarBackground}>
-            <View
-              style={[
-                styles.progressBarFill,
-                {
-                  width: `${Math.min(category.percentage, 100)}%`,
-                  backgroundColor:
-                    category.percentage > 80 ? '#ff6b6b' : category.color,
-                },
-              ]}
-            />
-          </View>
-          <Text
-            style={[
-              styles.percentageText,
-              { color: category.percentage > 80 ? '#ff6b6b' : '#00d4aa' },
-            ]}
-          >
-            {category.percentage.toFixed(0)}%
-          </Text>
-        </View>
-        {category.percentage > 90 && (
-          <Text style={styles.warningText}>⚠️ Budget almost exceeded!</Text>
-        )}
       </View>
     </View>
   );
@@ -450,14 +275,7 @@ const CategoriesScreen: React.FC = () => {
             onChangeText={setFormName}
           />
 
-          <TextInput
-            style={styles.modalInput}
-            placeholder="Budget Amount"
-            placeholderTextColor="rgba(255,255,255,0.5)"
-            value={formBudget}
-            onChangeText={setFormBudget}
-            keyboardType="numeric"
-          />
+
 
           {renderIconSelector()}
           {renderColorSelector()}
@@ -503,14 +321,7 @@ const CategoriesScreen: React.FC = () => {
             onChangeText={setFormName}
           />
 
-          <TextInput
-            style={styles.modalInput}
-            placeholder="Budget Amount"
-            placeholderTextColor="rgba(255,255,255,0.5)"
-            value={formBudget}
-            onChangeText={setFormBudget}
-            keyboardType="numeric"
-          />
+
 
           {renderIconSelector()}
           {renderColorSelector()}
@@ -538,10 +349,9 @@ const CategoriesScreen: React.FC = () => {
     </Modal>
   );
 
-  const totalSpent = categories.reduce((sum, cat) => sum + cat.amount, 0);
-  const totalBudget = categories.reduce((sum, cat) => sum + cat.budget, 0);
-  const overallPercentage =
-    totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+
+
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -552,7 +362,7 @@ const CategoriesScreen: React.FC = () => {
         >
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Categories & Budget</Text>
+        <Text style={styles.headerTitle}>Categories</Text>
         <TouchableOpacity
           style={styles.addHeaderButton}
           onPress={() => setIsAddModalVisible(true)}
@@ -561,41 +371,15 @@ const CategoriesScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
-        <View style={styles.overviewCard}>
-          <Text style={styles.overviewTitle}>December Overview</Text>
-          <View style={styles.overviewStats}>
-            <View style={styles.overviewStat}>
-              <Text style={styles.overviewValue}>
-                ₹{totalSpent.toLocaleString('en-IN')}
-              </Text>
-              <Text style={styles.overviewLabel}>Total Spent</Text>
-            </View>
-            <View style={styles.overviewStat}>
-              <Text style={styles.overviewValue}>
-                ₹{totalBudget.toLocaleString('en-IN')}
-              </Text>
-              <Text style={styles.overviewLabel}>Total Budget</Text>
-            </View>
-          </View>
-          <View style={styles.overviewProgress}>
-            <View style={styles.progressBarBackground}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  {
-                    width: `${Math.min(overallPercentage, 100)}%`,
-                    backgroundColor:
-                      overallPercentage > 80 ? '#ff6b6b' : '#4facfe',
-                  },
-                ]}
-              />
-            </View>
-            <Text style={styles.overviewPercentage}>
-              {overallPercentage.toFixed(0)}% of total budget used
-            </Text>
-          </View>
-        </View>
+      {isLoading ? (
+        <Text style={styles.loadingText}>Loading categories...</Text>
+      ) : isError ? (
+        <Text style={styles.errorText}>
+          Error: {error?.message || 'Failed to load categories'}
+        </Text>
+      ) : (
+        <ScrollView style={styles.content}>
+
 
         <View style={styles.categoriesSection}>
           <View style={styles.sectionHeader}>
@@ -621,6 +405,14 @@ const CategoriesScreen: React.FC = () => {
           )}
         </View>
       </ScrollView>
+      )}
+
+      <TouchableOpacity
+        style={styles.addButton}
+        onPress={() => setIsAddModalVisible(true)}
+      >
+        <Text style={styles.addButtonText}>+</Text>
+      </TouchableOpacity>
 
       {renderAddModal()}
       {renderEditModal()}
@@ -672,51 +464,23 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
   },
+  loadingText: {
+    color: '#ffffff',
+    fontSize: 18,
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  errorText: {
+    color: '#ff6b6b',
+    fontSize: 18,
+    textAlign: 'center',
+    marginTop: 20,
+  },
   content: {
     flex: 1,
     paddingHorizontal: 20,
   },
-  overviewCard: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 15,
-    padding: 20,
-    marginBottom: 25,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  overviewTitle: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-  },
-  overviewStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  overviewStat: {
-    alignItems: 'center',
-  },
-  overviewValue: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  overviewLabel: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-  },
-  overviewProgress: {
-    marginTop: 10,
-  },
-  overviewPercentage: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 8,
-  },
+
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -747,10 +511,10 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   emptyStateText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    color: '#ff6b6b',
+    fontSize: 18,
+    textAlign: 'center',
+    marginTop: 50,
   },
   emptyStateSubtext: {
     color: 'rgba(255,255,255,0.6)',

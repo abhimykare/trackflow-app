@@ -5,6 +5,7 @@ import {
   createStackNavigator,
   type StackNavigationProp,
 } from '@react-navigation/stack';
+import QueryProvider from '../providers/QueryProvider';
 import { View, Text, StyleSheet } from 'react-native';
 import HomeScreen from '../screens/home/HomeScreen';
 import DetailedViewScreen from '../screens/DetailedViewScreen';
@@ -169,9 +170,11 @@ const RouteNavigator = () => {
   );
 
   return (
-    <NavigationContainer>
-      {isAuthenticated ? <AppStack /> : <AuthStack />}
-    </NavigationContainer>
+    <QueryProvider>
+      <NavigationContainer>
+        {isAuthenticated ? <AppStack /> : <AuthStack />}
+      </NavigationContainer>
+    </QueryProvider>
   );
 };
 

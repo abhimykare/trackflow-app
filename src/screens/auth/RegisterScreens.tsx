@@ -20,7 +20,8 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../hooks/useAuth';
 
-const LoginScreen: React.FC = () => {
+const RegisterScreen: React.FC = () => {
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const navigation = useNavigation();
@@ -28,7 +29,7 @@ const LoginScreen: React.FC = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
-  const { login, isLoading, error, clearError } = useAuth();
+  const { register, isLoading, error, clearError } = useAuth();
 
   useEffect(() => {
     Animated.parallel([
@@ -49,13 +50,13 @@ const LoginScreen: React.FC = () => {
 
   // Clear error when user starts typing
   useEffect(() => {
-    if (error && (email || password)) {
+    if (error && (email || password || fullName)) {
       clearError();
     }
-  }, [email, password, error, clearError]);
+  }, [email, password, fullName, error, clearError]);
 
-  const handleLogin = async () => {
-    console.log('[LoginScreen] 🔐 Login button pressed');
+  const handleRegister = async () => {
+    console.log('[RegisterScreen] 🔐 Register button pressed');
 
     // Basic validation
     if (!email.trim()) {
@@ -68,20 +69,26 @@ const LoginScreen: React.FC = () => {
       return;
     }
 
+    if (!fullName.trim()) {
+      Alert.alert('Error', 'Please enter your full name');
+      return;
+    }
+
     try {
-      console.log('[LoginScreen] 📤 Starting login...');
-      await login({
+      console.log('[RegisterScreen] 📤 Starting registration...');
+      await register({
+        fullName: fullName.trim(),
         email: email.trim().toLowerCase(),
         password,
       });
 
-      console.log('[LoginScreen] ✅ Login successful');
+      console.log('[RegisterScreen] ✅ Registration successful');
       // Navigation will happen automatically via RouteNavigator
     } catch (err: any) {
-      console.error('[LoginScreen] ❌ Login failed:', err);
+      console.error('[RegisterScreen] ❌ Registration failed:', err);
       const errorMessage =
-        error || 'Login failed. Please check your credentials.';
-      Alert.alert('Login Failed', errorMessage);
+        error || 'Registration failed. Please try again.';
+      Alert.alert('Registration Failed', errorMessage);
     }
   };
 
@@ -107,6 +114,20 @@ const LoginScreen: React.FC = () => {
             <Text style={styles.appName}>TrackFlow</Text>
             <Text style={styles.tagline}>Smart expense tracking</Text>
           </Animated.View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Full Name</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your full name"
+              placeholderTextColor="rgba(255,255,255,0.4)"
+              value={fullName}
+              onChangeText={setFullName}
+              autoCapitalize="words"
+              editable={!isLoading}
+            />
+          </View>
+
 
           <Animated.View
             style={[
@@ -144,27 +165,23 @@ const LoginScreen: React.FC = () => {
               />
             </View>
 
-            <TouchableOpacity style={styles.forgotPassword}>
-              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-            </TouchableOpacity>
-
             <TouchableOpacity
               style={[styles.loginButton, isLoading && styles.disabledButton]}
-              onPress={handleLogin}
+              onPress={handleRegister}
               disabled={isLoading}
             >
               <Text style={styles.loginButtonText}>
-                {isLoading ? 'Signing In...' : 'Login'}
+                {isLoading ? 'Registering...' : 'Register'}
               </Text>
             </TouchableOpacity>
 
             <View style={styles.registerContainer}>
-              <Text style={styles.registerText}>Don't have an account? </Text>
+              <Text style={styles.registerText}>Already have an account? </Text>
               <TouchableOpacity
-                onPress={() => navigation.navigate('Register' as never)}
+                onPress={() => navigation.navigate('Login' as never)}
                 disabled={isLoading}
               >
-                <Text style={styles.registerLink}>Register</Text>
+                <Text style={styles.registerLink}>Login</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -274,4 +291,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LoginScreen;
+export default RegisterScreen;

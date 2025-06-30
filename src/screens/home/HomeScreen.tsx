@@ -12,6 +12,7 @@ import {
   StatusBar,
   ScrollView,
   Dimensions,
+  Pressable,
 } from 'react-native';
 
 import { useNavigation } from '@react-navigation/native';
@@ -396,24 +397,21 @@ const HomeScreen: React.FC = () => {
           ]}
         >
           <View style={styles.headerLeft}>
-            <View style={styles.profileAvatar}>
-              <Text style={styles.profileAvatarText}>
-                {user?.fullName?.charAt(0)?.toUpperCase() || 'AK'}
-              </Text>
-            </View>
+            <Pressable onPress={() => navigation.navigate('Profile')}>
+              <View style={styles.profileAvatar}>
+                <Text style={styles.profileAvatarText}>
+                  {user?.fullName?.charAt(0)?.toUpperCase() || 'AK'}
+                </Text>
+              </View>
+            </Pressable>
+
             <View style={styles.headerInfo}>
               <Text style={styles.headerGreeting}>Good Evening</Text>
               <Text style={styles.headerName}>
-                {user?.fullName || 'Arun Kumar'}
+                {user?.fullName || 'Anonymus_830'}
               </Text>
             </View>
           </View>
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={() => navigation.navigate('Profile')}
-          >
-            <Text style={styles.profileButtonText}>⚙️</Text>
-          </TouchableOpacity>
         </Animated.View>
 
         <ScrollView showsVerticalScrollIndicator={false}>
@@ -737,17 +735,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   quickActionsList: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 15,
   },
   quickActionCard: {
-    width: 70,
+    width: 80,
     alignItems: 'center',
     padding: 10,
     borderRadius: 10,
-    marginHorizontal: 5,
+    marginHorizontal: 8,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
   },
+
   quickActionIcon: {
     width: 30,
     height: 30,
