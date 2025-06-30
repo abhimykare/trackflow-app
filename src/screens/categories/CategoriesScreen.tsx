@@ -1,5 +1,15 @@
 import type React from 'react';
 import { useState, useEffect } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import {
+  Category, // Make sure Category is imported here
+  useGetCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory, // Import deleteCategory
+  type CreateCategoryPayload,
+  type UpdateCategoryPayload,
+} from '../../services/categoriesServices';
 import {
   SafeAreaView,
   View,
@@ -14,7 +24,6 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../routes/routeNavigator';
-import { useGetCategories } from '../../services/categoriesServices';
 
 const availableIcons = [
   '🍛',
@@ -61,45 +70,91 @@ const availableColors = [
   '#26de81',
 ];
 
-interface Category {
-  id: string; // This will map to _id from backend
-  name: string;
-  icon: string;
-  color: string;
-  _id?: string; // Optional backend ID for cases where it's still present
-  description?: string;
-  userId?: string;
-  isDefault?: boolean;
-  isActive?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-}
+
+
+
+
+
+
 
 const CategoriesScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { data: categoriesData, isLoading, isError, error } = useGetCategories();
-    const [categories, setCategories] = useState<Category[]>(
-    [],
-  );
+  const {
+    data: categoriesData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useGetCategories();
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  const deleteCategoryMutation = useMutation<any, Error, string>({
+    mutationFn: deleteCategory,
+    onSuccess: () => {
+      Alert.alert('Success', 'Category deleted successfully!');
+      refetch();
+    },
+    onError: err => {
+      Alert.alert('Error', err.message || 'Failed to delete category');
+    },
+  });
+
+  // Mutations for adding and updating categories
+  const addCategoryMutation = useMutation<any, Error, CreateCategoryPayload>({
+    mutationFn: createCategory,
+    onSuccess: () => {
+      Alert.alert('Success', 'Category added successfully!');
+      setIsAddModalVisible(false);
+      resetForm();
+      refetch();
+    },
+    onError: err => {
+      Alert.alert('Error', err.message || 'Failed to add category');
+    },
+  });
+
+  const updateCategoryMutation = useMutation<any, Error, {
+    categoryId: string;
+    payload: UpdateCategoryPayload;
+  }>({
+    mutationFn: ({ categoryId, payload }) => updateCategory(categoryId, payload),
+    onSuccess: () => {
+      Alert.alert('Success', 'Category updated successfully!');
+      setIsEditModalVisible(false);
+      setCurrentEditingCategory(null);
+      resetForm();
+      refetch();
+    },
+    onError: err => {
+      Alert.alert('Error', err.message || 'Failed to update category');
+    },
+  });
 
   useEffect(() => {
     if (categoriesData?.data?.categories) {
-      const transformedCategories: Category[] = categoriesData.data.categories.map(cat => ({
-        id: cat._id,
-        name: cat.name,
-        icon: cat.icon,
-        color: cat.color,
-      }));
+      const transformedCategories: Category[] =
+        categoriesData.data.categories.map(cat => ({
+          id: cat._id, // Use _id from backend as id
+          name: cat.name,
+          icon: cat.icon,
+          color: cat.color,
+          description: cat.description, // Include description
+          userId: cat.userId,
+          isDefault: cat.isDefault,
+          isActive: cat.isActive,
+          createdAt: cat.createdAt,
+          updatedAt: cat.updatedAt,
+        }));
       setCategories(transformedCategories);
     }
   }, [categoriesData]);
 
-
   // Modal states
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  const [currentEditingCategory, setCurrentEditingCategory] = useState<Category | null>(null);
+  const [currentEditingCategory, setCurrentEditingCategory] =
+    useState<Category | null>(null);
 
   // Form states
   const [formName, setFormName] = useState('');
@@ -118,17 +173,13 @@ const CategoriesScreen: React.FC = () => {
       return;
     }
 
-    const newCategory: Category = {
-      id: Date.now().toString(), // Temporary ID for client-side
+    const newCategoryPayload: CreateCategoryPayload = {
       name: formName.trim(),
       icon: formIcon,
       color: formColor,
+      // description: 'Optional description if you add a field for it'
     };
-
-    setCategories(prev => [...prev, newCategory]);
-    setIsAddModalVisible(false);
-    resetForm();
-    Alert.alert('Success', 'Category added successfully!');
+    addCategoryMutation.mutate(newCategoryPayload);
   };
 
   const handleEditCategory = (category: Category) => {
@@ -145,23 +196,17 @@ const CategoriesScreen: React.FC = () => {
       return;
     }
 
-    setCategories(prev =>
-      prev.map(cat =>
-        cat.id === currentEditingCategory.id
-          ? {
-              ...cat,
-              name: formName.trim(),
-              icon: formColor,
-              color: formColor,
-            }
-          : cat,
-      ),
-    );
+    const updatedCategoryPayload: UpdateCategoryPayload = {
+      name: formName.trim(),
+      icon: formIcon,
+      color: formColor,
+      // description: 'Optional description if you add a field for it'
+    };
 
-    setIsEditModalVisible(false);
-    setCurrentEditingCategory(null);
-    resetForm();
-    Alert.alert('Success', 'Category updated successfully!');
+    updateCategoryMutation.mutate({
+      categoryId: currentEditingCategory.id,
+      payload: updatedCategoryPayload,
+    });
   };
 
   const handleDeleteCategory = (categoryId: string, categoryName: string) => {
@@ -174,15 +219,12 @@ const CategoriesScreen: React.FC = () => {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            setCategories(prev => prev.filter(cat => cat.id !== categoryId));
-            Alert.alert('Success', 'Category deleted successfully!');
+            deleteCategoryMutation.mutate(categoryId);
           },
         },
       ],
     );
   };
-
-
 
 const renderCategoryItem = (category: Category) => (
     <View key={category.id} style={styles.categoryCard}>
@@ -275,8 +317,6 @@ const renderCategoryItem = (category: Category) => (
             onChangeText={setFormName}
           />
 
-
-
           {renderIconSelector()}
           {renderColorSelector()}
 
@@ -321,8 +361,6 @@ const renderCategoryItem = (category: Category) => (
             onChangeText={setFormName}
           />
 
-
-
           {renderIconSelector()}
           {renderColorSelector()}
 
@@ -349,10 +387,6 @@ const renderCategoryItem = (category: Category) => (
     </Modal>
   );
 
-
-
-
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -363,12 +397,6 @@ const renderCategoryItem = (category: Category) => (
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Categories</Text>
-        <TouchableOpacity
-          style={styles.addHeaderButton}
-          onPress={() => setIsAddModalVisible(true)}
-        >
-          <Text style={styles.addHeaderButtonText}>+</Text>
-        </TouchableOpacity>
       </View>
 
       {isLoading ? (
@@ -379,41 +407,31 @@ const renderCategoryItem = (category: Category) => (
         </Text>
       ) : (
         <ScrollView style={styles.content}>
-
-
-        <View style={styles.categoriesSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              Categories ({categories.length})
-            </Text>
-            <TouchableOpacity
-              style={styles.addCategoryButton}
-              onPress={() => setIsAddModalVisible(true)}
-            >
-              <Text style={styles.addCategoryButtonText}>+ Add Category</Text>
-            </TouchableOpacity>
-          </View>
-          {categories.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No categories yet</Text>
-              <Text style={styles.emptyStateSubtext}>
-                Add your first category to start tracking your expenses
+          <View style={styles.categoriesSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                Categories ({categories.length})
               </Text>
+              <TouchableOpacity
+                style={styles.addCategoryButton}
+                onPress={() => setIsAddModalVisible(true)}
+              >
+                <Text style={styles.addCategoryButtonText}>+ Add Category</Text>
+              </TouchableOpacity>
             </View>
-          ) : (
-            categories.map(renderCategoryItem)
-          )}
-        </View>
-      </ScrollView>
+            {categories.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>No categories yet</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  Add your first category to start tracking your expenses
+                </Text>
+              </View>
+            ) : (
+              categories.map(renderCategoryItem)
+            )}
+          </View>
+        </ScrollView>
       )}
-
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => setIsAddModalVisible(true)}
-      >
-        <Text style={styles.addButtonText}>+</Text>
-      </TouchableOpacity>
-
       {renderAddModal()}
       {renderEditModal()}
     </SafeAreaView>
@@ -450,6 +468,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 18,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   addHeaderButton: {
     width: 40,
